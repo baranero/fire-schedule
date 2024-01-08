@@ -5,6 +5,7 @@ import SignOut from "./pages/SignOut";
 import Profile from "./pages/Profile";
 
 export default function App() {
+  
   return (
     <BrowserRouter>
       <Routes>
