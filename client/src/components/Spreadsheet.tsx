@@ -1,94 +1,120 @@
 import React from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 
-const Spreadsheet = () => {
-  const generateDatesForJanuary = () => {
-    const dates = [];
-    for (let day = 1; day <= 31; day++) {
-      dates.push(`2024-01-${day.toString().padStart(2, "0")}`);
+type FirefighterRecord = {
+  firefighter: number;
+  [key: string]: number | null;
+};
+
+const generateDates = (year: number) => {
+  const dates = [];
+  for (let month = 0; month < 2; month++) {
+    const daysInMonth = month === 1 ? 29 : 31;
+    for (let day = 1; day <= daysInMonth; day++) {
+      dates.push(new Date(year, month, day).toLocaleDateString());
     }
-    return dates;
-  };
+  }
+  return dates;
+};
 
-  const generateRandomUsers = (count: number) => {
-    const users = [];
-    for (let i = 0; i < count; i++) {
-      users.push(`Firefighter ${i + 1}`);
+const getRandomFirefighter = (
+  available: number[] = Array.from({ length: 6 }, (_, i) => i + 1)
+): number[] => {
+  const numbers: number[] = [];
+
+  while (numbers.length < 2) {
+    const randomNumber = Math.floor(Math.random() * available.length) + 1;
+
+    if (!numbers.includes(available[randomNumber - 1])) {
+      numbers.push(available[randomNumber - 1]);
     }
-    return users;
-  };
+  }
 
-  const calculateWorkingHoursForUsers = (userCount: number) => {
-    const workingHoursForAllUsers = Array.from({ length: userCount }, () => Array(31).fill(null));
-    const serviceDays = [];
+  return numbers;
+};
 
-    for (let day = 1; day <= 31; day += 3) {
-      serviceDays.push(day);
+const getRandomFirefighters = (count: number): number[] => {
+  const selected: number[] = [];
+  while (selected.length < count) {
+    const randomNumber = Math.floor(Math.random() * 6) + 1;
+    if (!selected.includes(randomNumber)) {
+      selected.push(randomNumber);
     }
+  }
+  return selected;
+};
 
-    const firefighterRotation = Array.from({ length: userCount }, (_, i) => i);
-    let rotationIndex = 0;
+const generateInitialData = (): FirefighterRecord[] => {
+  const dates = generateDates(2024);
+  const data: FirefighterRecord[] = [];
 
-    serviceDays.forEach((serviceDay) => {
-      const selectedFirefighters = [];
+  const firefightersOnJanFirstAndSecond = getRandomFirefighters(4);
 
-      while (selectedFirefighters.length < 3) {
-        selectedFirefighters.push(firefighterRotation[rotationIndex++ % userCount]);
-      }
+  let lastFirefightersOnDuty = [...firefightersOnJanFirstAndSecond];
 
-      selectedFirefighters.forEach((firefighter) => {
-        workingHoursForAllUsers[firefighter][serviceDay - 1] = 16;
-        if (serviceDay < 31) {
-          workingHoursForAllUsers[firefighter][serviceDay] = 8;
+  for (let firefighter = 1; firefighter <= 6; firefighter++) {
+    const record: FirefighterRecord = { firefighter };
+
+    dates.forEach((date, i) => {
+      if (i % 3 === 0 || i % 3 === 1) {
+        let firefightersOnDuty;
+
+        if (i === 0 || i === 1) {
+          firefightersOnDuty = firefightersOnJanFirstAndSecond;
+        } else {
+          const available = Array.from({ length: 6 }, (_, i) => i + 1).filter(
+            (f) => !lastFirefightersOnDuty.includes(f)
+          );
+
+          const newFirefighters = getRandomFirefighter(available);
+
+          firefightersOnDuty = newFirefighters.concat(lastFirefightersOnDuty.slice(0, 2));
         }
-      });
+
+        record[date] = firefightersOnDuty.includes(firefighter) ? (i % 3 === 0 ? 16 : 8) : null;
+
+        if (i % 3 === 1) {
+          lastFirefightersOnDuty = firefightersOnDuty;
+        }
+      } else {
+        record[date] = null;
+      }
     });
 
-    return workingHoursForAllUsers;
-  };
+    data.push(record);
+  }
 
-  const users = generateRandomUsers(5);
-  const dates = generateDatesForJanuary();
-  const workingHoursForUsers = calculateWorkingHoursForUsers(users.length);
+  return data;
+};
 
-  const calculateTotalHours = (hoursArray: (number | null)[]) => {
-    return hoursArray.reduce((sum, hours) => sum! + (hours || 0), 0);
-  };
+const getFirefighterName = (number: number) => `Strażak ${number}`;
+
+const Spreadsheet = () => {
+  const data = React.useState<FirefighterRecord[]>(generateInitialData())[0];
+
+  const headers = generateDates(2024);
 
   return (
-    <div className="w-[90vw] overflow-x-auto mx-auto mt-10">
-      <Table className="border">
-        <TableHeader>
-          <TableRow className="text-xs">
-            <TableHead>Użytkownik</TableHead>
-            {dates.map((date) => (
-              <TableHead key={date}>{date}</TableHead>
-            ))}
-            <TableHead>Total Hours</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody className="text-xs">
-          {users.map((user, userIndex) => (
-            <React.Fragment key={user}>
-              <TableRow>
-                <TableCell rowSpan={2}>{user}</TableCell>
-                {workingHoursForUsers[userIndex].map((hours, index) => (
-                  <TableCell key={`hours-${user}-${dates[index]}`}>{hours}</TableCell>
-                ))}
-                <TableCell>{calculateTotalHours(workingHoursForUsers[userIndex])}</TableCell>
-              </TableRow>
-              <TableRow>
-                {dates.map((date) => (
-                  <TableCell key={`input-${user}-${date}`}>
-                    <input type="text" className="w-full" />
-                  </TableCell>
-                ))}
-              </TableRow>
-            </React.Fragment>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Nazwa</TableHead>
+          {headers.map((header) => (
+            <TableHead key={header}>{header}</TableHead>
           ))}
-        </TableBody>
-      </Table>
-    </div>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {data.map((record) => (
+          <TableRow key={record.firefighter}>
+            <TableCell>{getFirefighterName(record.firefighter)}</TableCell>
+            {headers.map((header) => (
+              <TableCell key={header}>{record[header] !== null ? record[header] : ""}</TableCell>
+            ))}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 };
 
