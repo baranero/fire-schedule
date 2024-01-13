@@ -1,119 +1,87 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 
-type FirefighterRecord = {
-  firefighter: number;
-  [key: string]: number | null;
+type User = {
+  id: number;
 };
 
-const generateDates = (year: number) => {
-  const dates = [];
-  for (let month = 0; month < 2; month++) {
-    const daysInMonth = month === 1 ? 29 : 31;
-    for (let day = 1; day <= daysInMonth; day++) {
-      dates.push(new Date(year, month, day).toLocaleDateString());
-    }
-  }
-  return dates;
+const generateUsers = (): User[] => {
+  return Array.from({ length: 6 }, (_, i) => ({ id: i + 1 }));
 };
-
-const getRandomFirefighter = (
-  available: number[] = Array.from({ length: 6 }, (_, i) => i + 1)
-): number[] => {
-  const numbers: number[] = [];
-
-  while (numbers.length < 2) {
-    const randomNumber = Math.floor(Math.random() * available.length) + 1;
-
-    if (!numbers.includes(available[randomNumber - 1])) {
-      numbers.push(available[randomNumber - 1]);
-    }
-  }
-
-  return numbers;
-};
-
-const getRandomFirefighters = (count: number): number[] => {
-  const selected: number[] = [];
-  while (selected.length < count) {
-    const randomNumber = Math.floor(Math.random() * 6) + 1;
-    if (!selected.includes(randomNumber)) {
-      selected.push(randomNumber);
-    }
-  }
-  return selected;
-};
-
-const generateInitialData = (): FirefighterRecord[] => {
-  const dates = generateDates(2024);
-  const data: FirefighterRecord[] = [];
-
-  const firefightersOnJanFirstAndSecond = getRandomFirefighters(4);
-
-  let lastFirefightersOnDuty = [...firefightersOnJanFirstAndSecond];
-
-  for (let firefighter = 1; firefighter <= 6; firefighter++) {
-    const record: FirefighterRecord = { firefighter };
-
-    dates.forEach((date, i) => {
-      if (i % 3 === 0 || i % 3 === 1) {
-        let firefightersOnDuty;
-
-        if (i === 0 || i === 1) {
-          firefightersOnDuty = firefightersOnJanFirstAndSecond;
-        } else {
-          const available = Array.from({ length: 6 }, (_, i) => i + 1).filter(
-            (f) => !lastFirefightersOnDuty.includes(f)
-          );
-
-          const newFirefighters = getRandomFirefighter(available);
-
-          firefightersOnDuty = newFirefighters.concat(lastFirefightersOnDuty.slice(0, 2));
-        }
-
-        record[date] = firefightersOnDuty.includes(firefighter) ? (i % 3 === 0 ? 16 : 8) : null;
-
-        if (i % 3 === 1) {
-          lastFirefightersOnDuty = firefightersOnDuty;
-        }
-      } else {
-        record[date] = null;
-      }
-    });
-
-    data.push(record);
-  }
-
-  return data;
-};
-
-const getFirefighterName = (number: number) => `Strażak ${number}`;
 
 const Spreadsheet = () => {
-  const data = React.useState<FirefighterRecord[]>(generateInitialData())[0];
+  const [users] = useState<User[]>(generateUsers());
+  const [selectedUsers, setSelectedUsers] = useState<{ [key: number]: number[] }>({});
+  const [day, setDay] = useState(1);
 
-  const headers = generateDates(2024);
+  useEffect(() => {
+    if (day > 31) return;
+
+    const usersToSelect: number[] = [];
+
+    if (day === 1 || day % 3 === 1) {
+      let allUserIds = users.map((u) => u.id);
+
+      const excludedDays = [day - 3];
+
+      const priorityUsers = allUserIds.filter((id) => {
+        return !excludedDays.some((d) => selectedUsers[d]?.includes(id));
+      });
+
+      while (usersToSelect.length < 2 && priorityUsers.length > 0) {
+        const randomIndex = Math.floor(Math.random() * priorityUsers.length);
+        usersToSelect.push(...priorityUsers.splice(randomIndex, 1));
+      }
+
+      allUserIds = allUserIds.filter((id) => !usersToSelect.includes(id));
+      while (usersToSelect.length < 4 && allUserIds.length > 0) {
+        const randomIndex = Math.floor(Math.random() * allUserIds.length);
+        usersToSelect.push(...allUserIds.splice(randomIndex, 1));
+      }
+    }
+
+    setSelectedUsers((prev) => ({ ...prev, [day]: usersToSelect }));
+    setDay(day + 1);
+  }, [day, users, selectedUsers]);
+
+  const renderCellValue = (userId: number, day: number) => {
+    if (day % 3 === 1 && selectedUsers[day]?.includes(userId)) return 16;
+    if (day % 3 === 2 && selectedUsers[day - 1]?.includes(userId)) return 8;
+    return "";
+  };
+
+  const renderTableData = () => {
+    return users.map((user) => {
+      let sum = 0;
+      const cells = Array.from({ length: 31 }, (_, i) => {
+        const day = i + 1;
+        const value = renderCellValue(user.id, day);
+        sum += Number(value);
+        return <TableCell key={day}>{value}</TableCell>;
+      });
+
+      return (
+        <TableRow key={user.id}>
+          <TableCell>User {user.id}</TableCell>
+          {cells}
+          <TableCell>{sum}</TableCell>
+        </TableRow>
+      );
+    });
+  };
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Nazwa</TableHead>
-          {headers.map((header) => (
-            <TableHead key={header}>{header}</TableHead>
+          <TableHead>User</TableHead>
+          {Array.from({ length: 31 }, (_, i) => (
+            <TableHead key={i + 1}>Day {i + 1}</TableHead>
           ))}
+          <TableHead>Total</TableHead>
         </TableRow>
       </TableHeader>
-      <TableBody>
-        {data.map((record) => (
-          <TableRow key={record.firefighter}>
-            <TableCell>{getFirefighterName(record.firefighter)}</TableCell>
-            {headers.map((header) => (
-              <TableCell key={header}>{record[header] !== null ? record[header] : ""}</TableCell>
-            ))}
-          </TableRow>
-        ))}
-      </TableBody>
+      <TableBody>{renderTableData()}</TableBody>
     </Table>
   );
 };
